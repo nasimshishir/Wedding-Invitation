@@ -7,25 +7,39 @@ import {
 } from "@/lib/guest-store";
 import type { GuestSide } from "@/types/guest";
 
-function isAuthorized(request: Request): boolean {
-  const expected = (process.env.HOST_PASSCODE ?? "nikah2026").trim();
+type PortalRole = "groom" | "bride" | "all";
+
+function resolvePortalRole(request: Request): PortalRole | null {
   const provided = (request.headers.get("x-host-passcode") ?? "").trim();
-  return expected.length > 0 && provided === expected;
+  if (!provided) return null;
+
+  const groomPass = (process.env.GROOM_PASSCODE ?? "groom2026").trim();
+  const bridePass = (process.env.BRIDE_PASSCODE ?? "bride2026").trim();
+  const hostPass = (process.env.HOST_PASSCODE ?? "nikah2026").trim();
+
+  if (groomPass && provided === groomPass) return "groom";
+  if (bridePass && provided === bridePass) return "bride";
+  if (hostPass && provided === hostPass) return "all";
+  return null;
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  const role = resolvePortalRole(request);
+  if (!role) {
     return NextResponse.json(
-      { ok: false, error: "Invalid host passcode" },
+      { ok: false, error: "Invalid passcode" },
       { status: 401 }
     );
   }
 
   try {
-    const guests = await listGuests();
+    const sideFilter: GuestSide | undefined =
+      role === "all" ? undefined : role;
+    const guests = await listGuests(sideFilter);
     const summary = computeDashboardSummary(guests);
     return NextResponse.json({
       ok: true,
+      role,
       mode: isGoogleSheetsConnected() ? "google-sheets" : "local-demo",
       guests,
       summary,
@@ -40,9 +54,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
+  const role = resolvePortalRole(request);
+  if (!role) {
     return NextResponse.json(
-      { ok: false, error: "Invalid host passcode" },
+      { ok: false, error: "Invalid passcode" },
       { status: 401 }
     );
   }
@@ -62,12 +77,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const side: GuestSide = body.side === "bride" ? "bride" : "groom";
+    // Lock the side & addedBy tag to the logged-in passcode so Groom/Bride families
+    // always write to their own spreadsheet and identify whose guest it is.
+    const side: GuestSide =
+      role === "groom"
+        ? "groom"
+        : role === "bride"
+        ? "bride"
+        : body.side === "bride"
+        ? "bride"
+        : "groom";
+
+    const addedBy =
+      role === "groom"
+        ? "Groom's Side"
+        : role === "bride"
+        ? "Bride's Side"
+        : `Host (${side === "bride" ? "Bride" : "Groom"}'s Side)`;
+
     const guest = await createOrUpdateGuest({
       slug: body.slug,
       displayName: body.displayName,
       side,
       maxSeats: Number(body.maxSeats ?? 1) || 1,
+      addedBy,
     });
 
     return NextResponse.json({ ok: true, guest });

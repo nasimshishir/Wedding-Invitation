@@ -114,9 +114,10 @@ export function RsvpSection({ guest, onUpdated }: RsvpSectionProps) {
 
       {!isEditing && alreadyResponded ? (
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-7 rounded-2xl border border-champagne-300/80 bg-ivory-50/90 p-6 text-center"
+          initial={{ opacity: 0, y: 12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-7 rounded-2xl border border-champagne-400/80 bg-ivory-50/95 p-6 text-center shadow-[0_14px_34px_-14px_rgba(127,94,46,0.22)]"
         >
           {guest.status === "Attending" ? (
             <div className="flex flex-col items-center">

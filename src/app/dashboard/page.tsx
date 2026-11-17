@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Eye,
   Lock,
+  LogOut,
   MailWarning,
   MessageSquare,
   Plus,
@@ -25,8 +26,11 @@ import type {
   GuestStatus,
 } from "@/types/guest";
 
+type PortalRole = "groom" | "bride" | "all";
+
 interface DashboardResponse {
   ok: boolean;
+  role: PortalRole;
   mode: "google-sheets" | "local-demo";
   guests: GuestRecord[];
   summary: DashboardSummary;
@@ -38,6 +42,12 @@ const STATUS_BADGE: Record<GuestStatus, string> = {
   Opened: "border-amber-300 bg-amber-50 text-amber-800",
   Attending: "border-emerald-300 bg-emerald-50 text-emerald-800",
   Declined: "border-rose-300 bg-rose-50 text-rose-800",
+};
+
+const ROLE_LABELS: Record<PortalRole, string> = {
+  groom: "Groom's Side Portal",
+  bride: "Bride's Side Portal",
+  all: "Both Sides (Master)",
 };
 
 function slugifyName(value: string): string {
@@ -83,6 +93,9 @@ export default function DashboardPage() {
       }
       setData(json);
       setUnlockedCode(code);
+      if (json.role === "groom" || json.role === "bride") {
+        setNewSide(json.role);
+      }
       sessionStorage.setItem("wedding_host_passcode", code);
     } catch (err) {
       setUnlockedCode(null);
@@ -101,12 +114,21 @@ export default function DashboardPage() {
     }
   }, [fetchDashboard]);
 
+  function handleLogout() {
+    sessionStorage.removeItem("wedding_host_passcode");
+    setUnlockedCode(null);
+    setData(null);
+    setPasscode("");
+    setSideFilter("ALL");
+  }
+
   const filteredGuests = useMemo(() => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
     return data.guests.filter((g) => {
       if (statusFilter !== "ALL" && g.status !== statusFilter) return false;
-      if (sideFilter !== "ALL" && g.side !== sideFilter) return false;
+      if (data.role === "all" && sideFilter !== "ALL" && g.side !== sideFilter)
+        return false;
       if (
         q &&
         !g.displayName.toLowerCase().includes(q) &&
@@ -133,11 +155,13 @@ export default function DashboardPage() {
 
   async function handleAddGuest(e: React.FormEvent) {
     e.preventDefault();
-    if (!unlockedCode) return;
+    if (!unlockedCode || !data) return;
     setSavingGuest(true);
     setAddError(null);
 
     try {
+      const effectiveSide =
+        data.role === "groom" || data.role === "bride" ? data.role : newSide;
       const res = await fetch("/api/dashboard", {
         method: "POST",
         headers: {
@@ -147,7 +171,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           displayName: newName,
           slug: newSlug || slugifyName(newName),
-          side: newSide,
+          side: effectiveSide,
           maxSeats: newMaxSeats,
         }),
       });
@@ -182,18 +206,19 @@ export default function DashboardPage() {
             <Lock className="h-5 w-5" />
           </div>
           <h1 className="mt-4 font-serif text-3xl font-semibold text-espresso-900">
-            Host Dashboard
+            Family Guest Portal
           </h1>
-          <p className="mt-1.5 text-xs text-espresso-500">
-            Enter your family passcode to view RSVP counts, opened statuses, and
-            generate guest links. (Demo passcode: <code>nikah2026</code>)
+          <p className="mt-1.5 text-xs leading-relaxed text-espresso-500">
+            Enter your <strong>Bride&apos;s Side</strong> or{" "}
+            <strong>Groom&apos;s Side</strong> passcode to view your guests,
+            track invite opens, and add new households.
           </p>
 
           <input
             type="password"
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
-            placeholder="Enter host passcode"
+            placeholder="Enter family passcode"
             required
             className="mt-5 w-full rounded-xl border border-champagne-300 bg-ivory-50 px-4 py-3 text-center text-sm text-espresso-900 focus:border-champagne-500 focus:outline-none"
           />
@@ -207,7 +232,7 @@ export default function DashboardPage() {
             disabled={loading}
             className="mt-4 w-full rounded-full bg-gradient-to-r from-champagne-600 to-champagne-500 py-3 text-xs font-semibold tracking-[0.2em] text-ivory-50 uppercase shadow-md transition hover:brightness-105 disabled:opacity-60"
           >
-            {loading ? "Checking..." : "Unlock Dashboard"}
+            {loading ? "Checking..." : "Unlock Portal"}
           </button>
 
           <Link
@@ -222,17 +247,21 @@ export default function DashboardPage() {
   }
 
   const { summary } = data;
+  const isSideScoped = data.role === "groom" || data.role === "bride";
 
   return (
     <div className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6">
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-serif text-3xl font-semibold text-espresso-900 sm:text-4xl">
               Guest &amp; RSVP Tracker
             </h1>
-            <span className="rounded-full border border-champagne-400/70 bg-ivory-50 px-3 py-0.5 text-[11px] font-semibold text-champagne-700">
+            <span className="rounded-full border border-champagne-500/70 bg-champagne-500/10 px-3 py-0.5 text-[11px] font-semibold text-champagne-700">
+              {ROLE_LABELS[data.role]}
+            </span>
+            <span className="rounded-full border border-champagne-400/70 bg-ivory-50 px-3 py-0.5 text-[11px] font-semibold text-espresso-700">
               {data.mode === "google-sheets"
                 ? "Google Sheets Live"
                 : "Local Demo Mode"}
@@ -240,11 +269,11 @@ export default function DashboardPage() {
           </div>
           <p className="mt-1 text-sm text-espresso-500">
             Track who opened their invite, who hasn&apos;t responded yet, and
-            exact headcounts across both families.
+            exact headcounts.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void fetchDashboard(unlockedCode)}
@@ -261,6 +290,14 @@ export default function DashboardPage() {
             <Plus className="h-3.5 w-3.5" />
             Add Guest
           </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 rounded-full border border-champagne-300 bg-ivory-50 px-4 py-2 text-xs font-semibold text-espresso-500 hover:bg-ivory-200"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Switch Passcode
+          </button>
         </div>
       </div>
 
@@ -271,7 +308,13 @@ export default function DashboardPage() {
           className="card-silk-surface mt-6 rounded-2xl border border-champagne-300/75 p-5 sm:p-6"
         >
           <h2 className="font-serif text-xl font-semibold text-espresso-900">
-            Add Pre-Configured Guest / Household
+            Add Pre-Configured Guest (
+            {isSideScoped
+              ? data.role === "bride"
+                ? "Bride's Side"
+                : "Groom's Side"
+              : "Choose Side"}
+            )
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div>
@@ -311,14 +354,22 @@ export default function DashboardPage() {
               <label className="mb-1 block text-xs font-semibold text-espresso-700">
                 Family Side
               </label>
-              <select
-                value={newSide}
-                onChange={(e) => setNewSide(e.target.value as GuestSide)}
-                className="w-full rounded-xl border border-champagne-300 bg-ivory-50 px-3 py-2 text-sm focus:border-champagne-500 focus:outline-none"
-              >
-                <option value="groom">Groom&apos;s Side</option>
-                <option value="bride">Bride&apos;s Side</option>
-              </select>
+              {isSideScoped ? (
+                <div className="rounded-xl border border-champagne-300/80 bg-ivory-100/90 px-3 py-2 text-sm font-medium text-champagne-700">
+                  {data.role === "bride"
+                    ? "Bride's Side (Locked)"
+                    : "Groom's Side (Locked)"}
+                </div>
+              ) : (
+                <select
+                  value={newSide}
+                  onChange={(e) => setNewSide(e.target.value as GuestSide)}
+                  className="w-full rounded-xl border border-champagne-300 bg-ivory-50 px-3 py-2 text-sm focus:border-champagne-500 focus:outline-none"
+                >
+                  <option value="groom">Groom&apos;s Side</option>
+                  <option value="bride">Bride&apos;s Side</option>
+                </select>
+              )}
             </div>
 
             <div>
@@ -377,8 +428,9 @@ export default function DashboardPage() {
             </span>
           </p>
           <p className="mt-1 text-[11px] text-espresso-500">
-            Groom: {summary.groomSideAttendingGuests} · Bride:{" "}
-            {summary.brideSideAttendingGuests}
+            {data.role === "all"
+              ? `Groom: ${summary.groomSideAttendingGuests} · Bride: ${summary.brideSideAttendingGuests}`
+              : ROLE_LABELS[data.role]}
           </p>
         </div>
 
@@ -465,15 +517,21 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={sideFilter}
-            onChange={(e) => setSideFilter(e.target.value as GuestSide | "ALL")}
-            className="rounded-full border border-champagne-300 bg-ivory-50 px-3.5 py-1.5 text-xs font-semibold text-espresso-700 focus:outline-none"
-          >
-            <option value="ALL">Both Sides</option>
-            <option value="groom">Groom&apos;s Side ({summary.groomSideHouseholds})</option>
-            <option value="bride">Bride&apos;s Side ({summary.brideSideHouseholds})</option>
-          </select>
+          {data.role === "all" ? (
+            <select
+              value={sideFilter}
+              onChange={(e) => setSideFilter(e.target.value as GuestSide | "ALL")}
+              className="rounded-full border border-champagne-300 bg-ivory-50 px-3.5 py-1.5 text-xs font-semibold text-espresso-700 focus:outline-none"
+            >
+              <option value="ALL">Both Sides</option>
+              <option value="groom">
+                Groom&apos;s Side ({summary.groomSideHouseholds})
+              </option>
+              <option value="bride">
+                Bride&apos;s Side ({summary.brideSideHouseholds})
+              </option>
+            </select>
+          ) : null}
 
           <div className="relative">
             <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-espresso-500" />
@@ -495,7 +553,7 @@ export default function DashboardPage() {
             <thead className="border-b border-champagne-300/60 bg-ivory-100/80 text-[11px] font-semibold tracking-wider text-espresso-500 uppercase">
               <tr>
                 <th className="px-5 py-3.5">Guest / Household</th>
-                <th className="px-4 py-3.5">Side</th>
+                <th className="px-4 py-3.5">Side / Added By</th>
                 <th className="px-4 py-3.5">Status</th>
                 <th className="px-4 py-3.5">Headcount</th>
                 <th className="px-4 py-3.5">Open Tracking</th>
@@ -528,6 +586,11 @@ export default function DashboardPage() {
                       <span className="inline-flex rounded-full border border-champagne-300/70 bg-ivory-50 px-2.5 py-0.5 text-xs font-medium text-espresso-700">
                         {g.side === "bride" ? "Bride's Side" : "Groom's Side"}
                       </span>
+                      {g.addedBy ? (
+                        <div className="mt-1 text-[11px] text-espresso-500">
+                          Added by: {g.addedBy}
+                        </div>
+                      ) : null}
                     </td>
 
                     <td className="px-4 py-4">

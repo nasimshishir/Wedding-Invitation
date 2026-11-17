@@ -1,27 +1,29 @@
 /**
- * Google Apps Script backend for the Wedding Invitation & RSVP Tracker.
+ * Google Apps Script backend for ONE side's Wedding Spreadsheet (Groom OR Bride).
+ * Deploy this script once in the Groom's Google Sheet, and once in the Bride's Google Sheet.
+ *
+ * Each spreadsheet file contains exactly TWO sheets:
+ *   1. "Guest List"   — Pre-configured households, open tracking, current RSVP status, and invite URLs
+ *   2. "Respond List" — Chronological log of every RSVP submission & update
  *
  * SETUP:
- * 1. Create a new Google Sheet.
- * 2. Go to Extensions -> Apps Script, paste this entire file, and save.
- * 3. Update BASE_SITE_URL below once you deploy to Vercel (or keep placeholder for now).
- * 4. Run `setupWeddingSheets()` once from the Apps Script toolbar to create the tabs & formulas.
- * 5. Click Deploy -> New deployment -> Web app:
+ * 1. Open your Google Sheet -> Extensions -> Apps Script -> paste this file -> Save.
+ * 2. Update BASE_SITE_URL below to your live Vercel URL (e.g. "https://sagor-and-moon.vercel.app").
+ * 3. Run `setupWeddingSheets()` once from the Apps Script toolbar to create "Guest List" & "Respond List".
+ * 4. Deploy -> New deployment -> Web app:
  *      - Execute as: Me
  *      - Who has access: Anyone
- * 6. Copy the Web App URL into your Next.js `.env.local` as GOOGLE_SCRIPT_URL=...
+ * 5. Put the Groom Sheet's /exec URL into GOOGLE_SCRIPT_URL_GROOM and the Bride Sheet's /exec URL into GOOGLE_SCRIPT_URL_BRIDE.
  */
 
 const BASE_SITE_URL = "https://your-wedding-site.vercel.app";
 
-const GUESTS_SHEET = "Guests";
-const LOG_SHEET = "RSVP_Log";
-const SUMMARY_SHEET = "Summary";
+const GUEST_LIST_SHEET = "Guest List";
+const RESPOND_LIST_SHEET = "Respond List";
 
 const GUEST_HEADERS = [
   "slug",
   "displayName",
-  "side",
   "maxSeats",
   "status",
   "openedAt",
@@ -31,26 +33,43 @@ const GUEST_HEADERS = [
   "message",
   "phone",
   "inviteUrl",
+  "addedBy",
+];
+
+const RESPOND_HEADERS = [
+  "timestamp",
+  "action",
+  "slug",
+  "displayName",
+  "status",
+  "attendingCount",
+  "maxSeats",
+  "phone",
+  "message",
 ];
 
 function setupWeddingSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // 1. Guests sheet
-  let guests = ss.getSheetByName(GUESTS_SHEET);
-  if (!guests) {
-    guests = ss.insertSheet(GUESTS_SHEET);
+  // Sheet 1: Guest List
+  let guestSheet = ss.getSheetByName(GUEST_LIST_SHEET);
+  if (!guestSheet) {
+    const firstSheet = ss.getSheets()[0];
+    if (firstSheet && firstSheet.getLastRow() === 0 && firstSheet.getName() === "Sheet1") {
+      firstSheet.setName(GUEST_LIST_SHEET);
+      guestSheet = firstSheet;
+    } else {
+      guestSheet = ss.insertSheet(GUEST_LIST_SHEET);
+    }
   }
-  if (guests.getLastRow() === 0) {
-    guests.appendRow(GUEST_HEADERS);
-    guests.getRange(1, 1, 1, GUEST_HEADERS.length).setFontWeight("bold").setBackground("#F3EADC");
-    guests.setFrozenRows(1);
+  if (guestSheet.getLastRow() === 0) {
+    guestSheet.appendRow(GUEST_HEADERS);
+    guestSheet.getRange(1, 1, 1, GUEST_HEADERS.length).setFontWeight("bold").setBackground("#F3EADC");
+    guestSheet.setFrozenRows(1);
 
-    // Sample rows
-    guests.appendRow([
-      "karim-uncle",
-      "Karim Uncle & Family",
-      "groom",
+    guestSheet.appendRow([
+      "sample-family",
+      "Sample Uncle & Family",
       4,
       "Not Opened",
       "",
@@ -60,66 +79,20 @@ function setupWeddingSheets() {
       "",
       "",
       `=IF(A2="","","${BASE_SITE_URL}/invite/"&A2)`,
-    ]);
-    guests.appendRow([
-      "farhana-apu",
-      "Farhana Apu & Family",
-      "bride",
-      3,
-      "Not Opened",
-      "",
-      0,
-      0,
-      "",
-      "",
-      "",
-      `=IF(A3="","","${BASE_SITE_URL}/invite/"&A3)`,
+      "Spreadsheet",
     ]);
   }
 
-  // 2. RSVP_Log sheet
-  let log = ss.getSheetByName(LOG_SHEET);
-  if (!log) {
-    log = ss.insertSheet(LOG_SHEET);
+  // Sheet 2: Respond List
+  let respondSheet = ss.getSheetByName(RESPOND_LIST_SHEET);
+  if (!respondSheet) {
+    respondSheet = ss.insertSheet(RESPOND_LIST_SHEET);
   }
-  if (log.getLastRow() === 0) {
-    log.appendRow([
-      "timestamp",
-      "action",
-      "slug",
-      "displayName",
-      "side",
-      "status",
-      "attendingCount",
-      "phone",
-      "message",
-    ]);
-    log.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#F3EADC");
-    log.setFrozenRows(1);
+  if (respondSheet.getLastRow() === 0) {
+    respondSheet.appendRow(RESPOND_HEADERS);
+    respondSheet.getRange(1, 1, 1, RESPOND_HEADERS.length).setFontWeight("bold").setBackground("#F3EADC");
+    respondSheet.setFrozenRows(1);
   }
-
-  // 3. Summary dashboard sheet
-  let summary = ss.getSheetByName(SUMMARY_SHEET);
-  if (!summary) {
-    summary = ss.insertSheet(SUMMARY_SHEET);
-  }
-  summary.clear();
-  const rows = [
-    ["Wedding RSVP Summary", "Count"],
-    ["Total Invited Households", `=COUNTA(${GUESTS_SHEET}!A2:A)`],
-    ["Total Reserved Seats (Max Capacity)", `=SUM(${GUESTS_SHEET}!D2:D)`],
-    ["Not Opened Yet", `=COUNTIF(${GUESTS_SHEET}!E2:E,"Not Opened")`],
-    ["Opened (Not Responded Yet)", `=COUNTIF(${GUESTS_SHEET}!E2:E,"Opened")`],
-    ["Attending Households", `=COUNTIF(${GUESTS_SHEET}!E2:E,"Attending")`],
-    ["Declined Households", `=COUNTIF(${GUESTS_SHEET}!E2:E,"Declined")`],
-    ["Total Confirmed Attending Guests", `=SUMIF(${GUESTS_SHEET}!E2:E,"Attending",${GUESTS_SHEET}!H2:H)`],
-    ["Groom's Side Confirmed Guests", `=SUMIFS(${GUESTS_SHEET}!H2:H,${GUESTS_SHEET}!E2:E,"Attending",${GUESTS_SHEET}!C2:C,"groom")`],
-    ["Bride's Side Confirmed Guests", `=SUMIFS(${GUESTS_SHEET}!H2:H,${GUESTS_SHEET}!E2:E,"Attending",${GUESTS_SHEET}!C2:C,"bride")`],
-  ];
-  summary.getRange(1, 1, rows.length, 2).setValues(rows);
-  summary.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#DFC8A2");
-  summary.setColumnWidth(1, 280);
-  summary.setColumnWidth(2, 120);
 }
 
 function jsonResponse(obj) {
@@ -132,15 +105,15 @@ function rowToGuest(row) {
   return {
     slug: String(row[0] || "").trim().toLowerCase(),
     displayName: String(row[1] || "").trim(),
-    side: String(row[2] || "groom").trim().toLowerCase() === "bride" ? "bride" : "groom",
-    maxSeats: Math.max(1, Number(row[3]) || 1),
-    status: String(row[4] || "Not Opened").trim() || "Not Opened",
-    openedAt: row[5] ? String(row[5]) : null,
-    openCount: Math.max(0, Number(row[6]) || 0),
-    attendingCount: Math.max(0, Number(row[7]) || 0),
-    respondedAt: row[8] ? String(row[8]) : null,
-    message: String(row[9] || ""),
-    phone: String(row[10] || ""),
+    maxSeats: Math.max(1, Number(row[2]) || 1),
+    status: String(row[3] || "Not Opened").trim() || "Not Opened",
+    openedAt: row[4] ? String(row[4]) : null,
+    openCount: Math.max(0, Number(row[5]) || 0),
+    attendingCount: Math.max(0, Number(row[6]) || 0),
+    respondedAt: row[7] ? String(row[7]) : null,
+    message: String(row[8] || ""),
+    phone: String(row[9] || ""),
+    addedBy: String(row[11] || ""),
   };
 }
 
@@ -166,17 +139,17 @@ function findGuestRowIndex(sheet, slug) {
   return -1;
 }
 
-function appendLog(ss, action, guest) {
-  const log = ss.getSheetByName(LOG_SHEET);
-  if (!log) return;
-  log.appendRow([
+function appendRespondRow(ss, action, guest) {
+  const respondSheet = ss.getSheetByName(RESPOND_LIST_SHEET);
+  if (!respondSheet) return;
+  respondSheet.appendRow([
     new Date().toISOString(),
     action,
     guest.slug,
     guest.displayName,
-    guest.side,
     guest.status,
     guest.attendingCount,
+    guest.maxSeats,
     guest.phone,
     guest.message,
   ]);
@@ -185,9 +158,9 @@ function appendLog(ss, action, guest) {
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : "";
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(GUESTS_SHEET);
+  const sheet = ss.getSheetByName(GUEST_LIST_SHEET);
   if (!sheet) {
-    return jsonResponse({ error: "Guests sheet not found. Run setupWeddingSheets() first." });
+    return jsonResponse({ error: 'Sheet "Guest List" not found. Run setupWeddingSheets() first.' });
   }
 
   if (action === "getGuest") {
@@ -202,7 +175,7 @@ function doGet(e) {
     return jsonResponse({ guests: getAllGuests(sheet) });
   }
 
-  return jsonResponse({ ok: true, message: "Wedding RSVP Apps Script is active." });
+  return jsonResponse({ ok: true, message: "Wedding Guest List & Respond List Apps Script active." });
 }
 
 function doPost(e) {
@@ -213,9 +186,9 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents || "{}");
     const action = payload.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(GUESTS_SHEET);
+    const sheet = ss.getSheetByName(GUEST_LIST_SHEET);
     if (!sheet) {
-      return jsonResponse({ error: "Guests sheet not found. Run setupWeddingSheets() first." });
+      return jsonResponse({ error: 'Sheet "Guest List" not found. Run setupWeddingSheets() first.' });
     }
 
     const slug = String(payload.slug || "").trim().toLowerCase();
@@ -231,7 +204,7 @@ function doPost(e) {
       const nextOpenedAt = current.openedAt || now;
       const nextOpenCount = current.openCount + 1;
 
-      sheet.getRange(rowIdx, 5, 1, 3).setValues([[nextStatus, nextOpenedAt, nextOpenCount]]);
+      sheet.getRange(rowIdx, 4, 1, 3).setValues([[nextStatus, nextOpenedAt, nextOpenCount]]);
 
       const updated = Object.assign({}, current, {
         status: nextStatus,
@@ -239,9 +212,6 @@ function doPost(e) {
         openCount: nextOpenCount,
       });
 
-      if (current.openCount === 0) {
-        appendLog(ss, "FIRST_OPEN", updated);
-      }
       return jsonResponse({ guest: updated });
     }
 
@@ -261,7 +231,7 @@ function doPost(e) {
       const msg = String(payload.message || "").trim();
       const phone = String(payload.phone || "").trim();
 
-      sheet.getRange(rowIdx, 5, 1, 7).setValues([
+      sheet.getRange(rowIdx, 4, 1, 7).setValues([
         [nextStatus, nextOpenedAt, Math.max(1, current.openCount), count, now, msg, phone],
       ]);
 
@@ -275,18 +245,21 @@ function doPost(e) {
         phone: phone,
       });
 
-      appendLog(ss, "RSVP_SUBMITTED", updated);
+      appendRespondRow(ss, "RSVP_SUBMITTED", updated);
       return jsonResponse({ guest: updated });
     }
 
     if (action === "upsertGuest") {
       const displayName = String(payload.displayName || "").trim();
-      const side = payload.side === "bride" ? "bride" : "groom";
       const maxSeats = Math.max(1, Math.min(20, Number(payload.maxSeats) || 1));
+      const addedBy = String(payload.addedBy || "").trim();
       const rowIdx = findGuestRowIndex(sheet, slug);
 
       if (rowIdx >= 2) {
-        sheet.getRange(rowIdx, 2, 1, 3).setValues([[displayName, side, maxSeats]]);
+        sheet.getRange(rowIdx, 2, 1, 2).setValues([[displayName, maxSeats]]);
+        if (addedBy) {
+          sheet.getRange(rowIdx, 12).setValue(addedBy);
+        }
         const updatedRow = sheet.getRange(rowIdx, 1, 1, GUEST_HEADERS.length).getValues()[0];
         return jsonResponse({ guest: rowToGuest(updatedRow) });
       }
@@ -295,7 +268,6 @@ function doPost(e) {
       sheet.appendRow([
         slug,
         displayName,
-        side,
         maxSeats,
         "Not Opened",
         "",
@@ -305,6 +277,7 @@ function doPost(e) {
         "",
         "",
         `=IF(A${newRowNum}="","","${BASE_SITE_URL}/invite/"&A${newRowNum})`,
+        addedBy,
       ]);
       const createdRow = sheet.getRange(newRowNum, 1, 1, GUEST_HEADERS.length).getValues()[0];
       return jsonResponse({ guest: rowToGuest(createdRow) });

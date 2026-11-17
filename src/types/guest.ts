@@ -14,6 +14,7 @@ export interface GuestRecord {
   respondedAt: string | null;
   message: string;
   phone: string;
+  addedBy?: string;
 }
 
 export interface DashboardSummary {

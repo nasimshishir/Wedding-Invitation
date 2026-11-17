@@ -35,9 +35,9 @@ body {
 .ivory-paper-bg {
   background-color: #faf6ee;
   background-image:
-    radial-gradient(at 15% 15%, rgba(223, 200, 162, 0.28) 0px, transparent 50%),
-    radial-gradient(at 85% 20%, rgba(235, 221, 198, 0.45) 0px, transparent 52%),
-    radial-gradient(at 50% 85%, rgba(213, 180, 130, 0.2) 0px, transparent 55%);
+    radial-gradient(at 15% 15%, rgba(223, 200, 162, 0.24) 0px, transparent 50%),
+    radial-gradient(at 85% 20%, rgba(235, 221, 198, 0.42) 0px, transparent 52%),
+    radial-gradient(at 50% 85%, rgba(213, 180, 130, 0.18) 0px, transparent 55%);
 }
 
 .champagne-foil-text {
@@ -58,11 +58,34 @@ body {
 .card-silk-surface {
   background: linear-gradient(
     180deg,
-    rgba(255, 253, 249, 0.96) 0%,
-    rgba(250, 244, 234, 0.94) 100%
+    rgba(255, 253, 249, 0.97) 0%,
+    rgba(250, 244, 234, 0.95) 100%
   );
   box-shadow:
-    0 24px 70px -24px rgba(96, 73, 39, 0.18),
-    0 4px 16px -4px rgba(96, 73, 39, 0.08),
+    0 24px 64px -22px rgba(96, 73, 39, 0.16),
+    0 4px 16px -4px rgba(96, 73, 39, 0.06),
     inset 0 0 0 1px rgba(190, 151, 91, 0.24);
+}
+
+.linen-door-surface {
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 253, 249, 0.96), rgba(242, 231, 213, 0.98)),
+    #f6ede0;
+}
+
+.perspective-1800 {
+  perspective: 1800px;
+}
+
+.perspective-1200 {
+  perspective: 1200px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }

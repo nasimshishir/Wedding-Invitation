@@ -4,26 +4,28 @@
     "displayName": "Karim Uncle & Family",
     "side": "groom",
     "maxSeats": 4,
-    "status": "Not Opened",
-    "openedAt": null,
-    "openCount": 0,
+    "status": "Opened",
+    "openedAt": "2026-11-17T19:53:47.108Z",
+    "openCount": 1,
     "attendingCount": 0,
     "respondedAt": null,
     "message": "",
-    "phone": ""
+    "phone": "",
+    "addedBy": "Groom's Side"
   },
   {
     "slug": "farhana-apu",
     "displayName": "Farhana Apu & Family",
     "side": "bride",
     "maxSeats": 3,
-    "status": "Attending",
+    "status": "Opened",
     "openedAt": "2026-11-17T15:10:00.000Z",
-    "openCount": 3,
-    "attendingCount": 3,
-    "respondedAt": "2026-11-17T18:50:24.340Z",
+    "openCount": 2,
+    "attendingCount": 0,
+    "respondedAt": null,
     "message": "",
-    "phone": ""
+    "phone": "",
+    "addedBy": "Bride's Side"
   },
   {
     "slug": "dr-mahmud-family",
@@ -36,7 +38,8 @@
     "attendingCount": 2,
     "respondedAt": "2026-11-16T10:25:12.000Z",
     "message": "BarakAllahu lakuma wa baraka alaikuma! Can't wait to celebrate with both families.",
-    "phone": "+880 1711-223344"
+    "phone": "+880 1711-223344",
+    "addedBy": "Groom's Side"
   },
   {
     "slug": "nusrat-and-saad",
@@ -49,7 +52,8 @@
     "attendingCount": 2,
     "respondedAt": "2026-11-15T19:08:40.000Z",
     "message": "Mubarak to Amina & Zayd! Looking forward to the Nikah and dinner.",
-    "phone": "+880 1811-556677"
+    "phone": "+880 1811-556677",
+    "addedBy": "Bride's Side"
   },
   {
     "slug": "tanvir-bhai",
@@ -62,7 +66,8 @@
     "attendingCount": 0,
     "respondedAt": "2026-11-15T12:04:00.000Z",
     "message": "Will be traveling that week unfortunately, but sending all my duas!",
-    "phone": ""
+    "phone": "",
+    "addedBy": "Groom's Side"
   },
   {
     "slug": "shaheen-khala",
@@ -75,6 +80,7 @@
     "attendingCount": 0,
     "respondedAt": null,
     "message": "",
-    "phone": ""
+    "phone": "",
+    "addedBy": "Bride's Side"
   }
 ]

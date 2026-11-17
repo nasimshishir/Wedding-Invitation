@@ -165,29 +165,33 @@ export function WaxSealMonogram({ monogram }: { monogram: string }) {
 }
 
 const PETALS = [
-  { id: 1, left: "8%", delay: 0, duration: 13, size: 12 },
-  { id: 2, left: "22%", delay: 2.5, duration: 15, size: 10 },
-  { id: 3, left: "41%", delay: 5, duration: 14, size: 14 },
-  { id: 4, left: "63%", delay: 1.4, duration: 16, size: 11 },
-  { id: 5, left: "79%", delay: 3.8, duration: 13.5, size: 13 },
-  { id: 6, left: "91%", delay: 6.2, duration: 15.5, size: 10 },
+  { id: 1, left: "6%", delay: 0, duration: 13, size: 13 },
+  { id: 2, left: "18%", delay: 2.5, duration: 15, size: 11 },
+  { id: 3, left: "34%", delay: 4.8, duration: 14, size: 15 },
+  { id: 4, left: "51%", delay: 1.2, duration: 16, size: 12 },
+  { id: 5, left: "68%", delay: 3.4, duration: 13.5, size: 14 },
+  { id: 6, left: "82%", delay: 5.7, duration: 15.5, size: 11 },
+  { id: 7, left: "93%", delay: 2.1, duration: 14.5, size: 13 },
 ];
 
 export function FloatingPetals() {
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      className="perspective-1000 pointer-events-none fixed inset-0 z-0 overflow-hidden"
       aria-hidden="true"
     >
-      {PETALS.map((petal) => (
+      {PETALS.map((petal, idx) => (
         <motion.div
           key={petal.id}
-          initial={{ y: -40, x: 0, opacity: 0, rotate: 0 }}
+          initial={{ y: -40, x: 0, opacity: 0, rotateX: 0, rotateY: 0, rotateZ: 0 }}
           animate={{
             y: ["0vh", "105vh"],
-            x: [0, 24, -18, 12],
-            opacity: [0, 0.55, 0.45, 0],
-            rotate: [0, 140, 280],
+            x: [0, idx % 2 === 0 ? 28 : -24, idx % 2 === 0 ? -18 : 22, 10],
+            opacity: [0, 0.65, 0.5, 0],
+            rotateX: [0, 210, 420],
+            rotateY: [0, 180, 360],
+            rotateZ: [0, 140, 280],
+            scale: [0.85, 1.12, 0.9],
           }}
           transition={{
             duration: petal.duration,
@@ -195,7 +199,7 @@ export function FloatingPetals() {
             repeat: Infinity,
             ease: "linear",
           }}
-          style={{ left: petal.left }}
+          style={{ left: petal.left, transformStyle: "preserve-3d" }}
           className="absolute top-0"
         >
           <svg
@@ -207,7 +211,7 @@ export function FloatingPetals() {
             <path
               d="M8 1C12.5 5.5 14.5 11.5 12 16.5C10 20 6 20.5 3.5 17C1 13.5 2.5 6.5 8 1Z"
               fill="#EBD9BC"
-              fillOpacity="0.7"
+              fillOpacity="0.78"
               stroke="#CFAF7B"
               strokeWidth="0.7"
             />

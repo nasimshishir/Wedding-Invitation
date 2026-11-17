@@ -13,13 +13,36 @@ const globalForDemo = globalThis as unknown as {
   __weddingDemoGuests?: GuestRecord[];
 };
 
-function getScriptUrl(): string | null {
-  const url = process.env.GOOGLE_SCRIPT_URL?.trim();
-  return url && url.length > 0 ? url : null;
+interface SideEndpoint {
+  side: GuestSide;
+  url: string;
+}
+
+function getConfiguredEndpoints(): SideEndpoint[] {
+  const groomUrl = process.env.GOOGLE_SCRIPT_URL_GROOM?.trim();
+  const brideUrl = process.env.GOOGLE_SCRIPT_URL_BRIDE?.trim();
+  const endpoints: SideEndpoint[] = [];
+
+  if (groomUrl) endpoints.push({ side: "groom", url: groomUrl });
+  if (brideUrl) endpoints.push({ side: "bride", url: brideUrl });
+
+  if (endpoints.length === 0) {
+    const legacyUrl = process.env.GOOGLE_SCRIPT_URL?.trim();
+    if (legacyUrl) endpoints.push({ side: "groom", url: legacyUrl });
+  }
+
+  return endpoints;
+}
+
+function getEndpointForSide(side: GuestSide): string | null {
+  const endpoints = getConfiguredEndpoints();
+  const match = endpoints.find((ep) => ep.side === side);
+  if (match) return match.url;
+  return endpoints[0]?.url ?? null;
 }
 
 export function isGoogleSheetsConnected(): boolean {
-  return getScriptUrl() !== null;
+  return getConfiguredEndpoints().length > 0;
 }
 
 async function readLocalGuests(): Promise<GuestRecord[]> {
@@ -44,12 +67,16 @@ async function writeLocalGuests(guests: GuestRecord[]): Promise<void> {
     await fs.writeFile(DATA_FILE, JSON.stringify(guests, null, 2) + "\n", "utf8");
   } catch {
     // Serverless environments (e.g. Vercel) have a read-only filesystem;
-    // keep the updated state in memory until GOOGLE_SCRIPT_URL is configured.
+    // keep the updated state in memory until Google Sheets URLs are configured.
   }
 }
 
-function normalizeGuest(raw: Partial<GuestRecord>): GuestRecord {
-  const side: GuestSide = raw.side === "bride" ? "bride" : "groom";
+function normalizeGuest(
+  raw: Partial<GuestRecord>,
+  forcedSide?: GuestSide
+): GuestRecord {
+  const side: GuestSide =
+    forcedSide ?? (raw.side === "bride" ? "bride" : "groom");
   const maxSeats = Math.max(1, Number(raw.maxSeats ?? 1) || 1);
   const validStatuses: GuestStatus[] = [
     "Not Opened",
@@ -76,22 +103,25 @@ function normalizeGuest(raw: Partial<GuestRecord>): GuestRecord {
     respondedAt: raw.respondedAt ? String(raw.respondedAt) : null,
     message: raw.message ? String(raw.message) : "",
     phone: raw.phone ? String(raw.phone) : "",
+    addedBy: raw.addedBy
+      ? String(raw.addedBy)
+      : side === "bride"
+      ? "Bride's Side"
+      : "Groom's Side",
   };
 }
 
 async function callAppsScriptGet<T>(
+  scriptUrl: string,
   params: Record<string, string>
 ): Promise<T> {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) {
-    throw new Error("GOOGLE_SCRIPT_URL is not configured");
-  }
   const url = new URL(scriptUrl);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
   const res = await fetch(url.toString(), {
     method: "GET",
+    redirect: "follow",
     cache: "no-store",
   });
   if (!res.ok) {
@@ -101,16 +131,14 @@ async function callAppsScriptGet<T>(
 }
 
 async function callAppsScriptPost<T>(
+  scriptUrl: string,
   payload: Record<string, unknown>
 ): Promise<T> {
-  const scriptUrl = getScriptUrl();
-  if (!scriptUrl) {
-    throw new Error("GOOGLE_SCRIPT_URL is not configured");
-  }
   const res = await fetch(scriptUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    redirect: "follow",
     cache: "no-store",
   });
   if (!res.ok) {
@@ -119,16 +147,40 @@ async function callAppsScriptPost<T>(
   return (await res.json()) as T;
 }
 
+async function resolveRemoteGuestEndpoint(
+  slug: string
+): Promise<{ endpoint: SideEndpoint; guest: GuestRecord } | null> {
+  const endpoints = getConfiguredEndpoints();
+  const results = await Promise.all(
+    endpoints.map(async (ep) => {
+      try {
+        const data = await callAppsScriptGet<{ guest: GuestRecord | null }>(
+          ep.url,
+          { action: "getGuest", slug }
+        );
+        if (data.guest) {
+          return {
+            endpoint: ep,
+            guest: normalizeGuest(data.guest, ep.side),
+          };
+        }
+      } catch (err) {
+        console.error(`Failed querying ${ep.side} spreadsheet:`, err);
+      }
+      return null;
+    })
+  );
+
+  return results.find((r) => r !== null) ?? null;
+}
+
 export async function getGuestBySlug(slug: string): Promise<GuestRecord | null> {
   const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
 
-  if (getScriptUrl()) {
-    const data = await callAppsScriptGet<{ guest: GuestRecord | null }>({
-      action: "getGuest",
-      slug: normalizedSlug,
-    });
-    return data.guest ? normalizeGuest(data.guest) : null;
+  if (isGoogleSheetsConnected()) {
+    const resolved = await resolveRemoteGuestEndpoint(normalizedSlug);
+    return resolved ? resolved.guest : null;
   }
 
   const guests = await readLocalGuests();
@@ -136,16 +188,27 @@ export async function getGuestBySlug(slug: string): Promise<GuestRecord | null> 
   return found ? normalizeGuest(found) : null;
 }
 
-export async function listGuests(): Promise<GuestRecord[]> {
-  if (getScriptUrl()) {
-    const data = await callAppsScriptGet<{ guests: GuestRecord[] }>({
-      action: "listGuests",
-    });
-    return (data.guests ?? []).map(normalizeGuest);
+export async function listGuests(sideFilter?: GuestSide): Promise<GuestRecord[]> {
+  if (isGoogleSheetsConnected()) {
+    const endpoints = getConfiguredEndpoints().filter(
+      (ep) => !sideFilter || ep.side === sideFilter
+    );
+    const lists = await Promise.all(
+      endpoints.map(async (ep) => {
+        const data = await callAppsScriptGet<{ guests: GuestRecord[] }>(
+          ep.url,
+          { action: "listGuests" }
+        );
+        return (data.guests ?? []).map((g) => normalizeGuest(g, ep.side));
+      })
+    );
+    return lists.flat();
   }
 
   const guests = await readLocalGuests();
-  return guests.map(normalizeGuest);
+  return guests
+    .map((g) => normalizeGuest(g))
+    .filter((g) => !sideFilter || g.side === sideFilter);
 }
 
 export async function trackGuestOpen(
@@ -154,13 +217,19 @@ export async function trackGuestOpen(
   const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
 
-  if (getScriptUrl()) {
-    const data = await callAppsScriptPost<{ guest: GuestRecord | null }>({
-      action: "trackOpen",
-      slug: normalizedSlug,
-      timestamp: new Date().toISOString(),
-    });
-    return data.guest ? normalizeGuest(data.guest) : null;
+  if (isGoogleSheetsConnected()) {
+    const resolved = await resolveRemoteGuestEndpoint(normalizedSlug);
+    if (!resolved) return null;
+
+    const data = await callAppsScriptPost<{ guest: GuestRecord | null }>(
+      resolved.endpoint.url,
+      {
+        action: "trackOpen",
+        slug: normalizedSlug,
+        timestamp: new Date().toISOString(),
+      }
+    );
+    return data.guest ? normalizeGuest(data.guest, resolved.endpoint.side) : null;
   }
 
   const guests = await readLocalGuests();
@@ -191,17 +260,23 @@ export async function submitGuestRsvp(input: {
   const normalizedSlug = input.slug.trim().toLowerCase();
   if (!normalizedSlug) return null;
 
-  if (getScriptUrl()) {
-    const data = await callAppsScriptPost<{ guest: GuestRecord | null }>({
-      action: "submitRsvp",
-      slug: normalizedSlug,
-      attending: input.attending,
-      attendingCount: input.attendingCount,
-      message: input.message ?? "",
-      phone: input.phone ?? "",
-      timestamp: new Date().toISOString(),
-    });
-    return data.guest ? normalizeGuest(data.guest) : null;
+  if (isGoogleSheetsConnected()) {
+    const resolved = await resolveRemoteGuestEndpoint(normalizedSlug);
+    if (!resolved) return null;
+
+    const data = await callAppsScriptPost<{ guest: GuestRecord | null }>(
+      resolved.endpoint.url,
+      {
+        action: "submitRsvp",
+        slug: normalizedSlug,
+        attending: input.attending,
+        attendingCount: input.attendingCount,
+        message: input.message ?? "",
+        phone: input.phone ?? "",
+        timestamp: new Date().toISOString(),
+      }
+    );
+    return data.guest ? normalizeGuest(data.guest, resolved.endpoint.side) : null;
   }
 
   const guests = await readLocalGuests();
@@ -234,6 +309,7 @@ export async function createOrUpdateGuest(input: {
   displayName: string;
   side: GuestSide;
   maxSeats: number;
+  addedBy?: string;
 }): Promise<GuestRecord> {
   const normalizedSlug = input.slug
     .trim()
@@ -246,16 +322,24 @@ export async function createOrUpdateGuest(input: {
   }
 
   const maxSeats = Math.max(1, Math.min(20, Math.round(input.maxSeats || 1)));
+  const addedBy =
+    input.addedBy?.trim() ||
+    (input.side === "bride" ? "Bride's Side" : "Groom's Side");
 
-  if (getScriptUrl()) {
-    const data = await callAppsScriptPost<{ guest: GuestRecord }>({
+  if (isGoogleSheetsConnected()) {
+    const targetUrl = getEndpointForSide(input.side);
+    if (!targetUrl) {
+      throw new Error(`No Google Script URL configured for ${input.side} side.`);
+    }
+    const data = await callAppsScriptPost<{ guest: GuestRecord }>(targetUrl, {
       action: "upsertGuest",
       slug: normalizedSlug,
       displayName: input.displayName.trim(),
       side: input.side,
       maxSeats,
+      addedBy,
     });
-    return normalizeGuest(data.guest);
+    return normalizeGuest(data.guest, input.side);
   }
 
   const guests = await readLocalGuests();
@@ -269,6 +353,7 @@ export async function createOrUpdateGuest(input: {
       side: input.side,
       maxSeats,
       attendingCount: Math.min(existing.attendingCount, maxSeats),
+      addedBy,
     };
     guests[idx] = updated;
     await writeLocalGuests(guests);
@@ -287,6 +372,7 @@ export async function createOrUpdateGuest(input: {
     respondedAt: null,
     message: "",
     phone: "",
+    addedBy,
   };
   guests.push(created);
   await writeLocalGuests(guests);
