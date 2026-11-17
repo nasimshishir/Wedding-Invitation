@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-script: "Great Vibes", cursive;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  --color-ivory-50: #fdfbf7;
+  --color-ivory-100: #faf6ee;
+  --color-ivory-200: #f3eadc;
+  --color-ivory-300: #e7d9c2;
+  --color-champagne-300: #e5cfb0;
+  --color-champagne-400: #d5b482;
+  --color-champagne-500: #be975b;
+  --color-champagne-600: #9f7940;
+  --color-champagne-700: #7f5e2e;
+  --color-espresso-900: #2b221c;
+  --color-espresso-700: #514238;
+  --color-espresso-500: #7a6a5e;
+  --color-sage-500: #7e8a74;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #faf6ee;
+  color: #2b221c;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ivory-paper-bg {
+  background-color: #faf6ee;
+  background-image:
+    radial-gradient(at 15% 15%, rgba(223, 200, 162, 0.28) 0px, transparent 50%),
+    radial-gradient(at 85% 20%, rgba(235, 221, 198, 0.45) 0px, transparent 52%),
+    radial-gradient(at 50% 85%, rgba(213, 180, 130, 0.2) 0px, transparent 55%);
+}
+
+.champagne-foil-text {
+  background: linear-gradient(
+    120deg,
+    #8d6a34 0%,
+    #c6a164 32%,
+    #e5cfa5 50%,
+    #b68e4f 68%,
+    #85622e 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card-silk-surface {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 253, 249, 0.96) 0%,
+    rgba(250, 244, 234, 0.94) 100%
+  );
+  box-shadow:
+    0 24px 70px -24px rgba(96, 73, 39, 0.18),
+    0 4px 16px -4px rgba(96, 73, 39, 0.08),
+    inset 0 0 0 1px rgba(190, 151, 91, 0.24);
+}

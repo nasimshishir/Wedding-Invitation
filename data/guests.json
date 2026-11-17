@@ -1,0 +1,80 @@
+[
+  {
+    "slug": "karim-uncle",
+    "displayName": "Karim Uncle & Family",
+    "side": "groom",
+    "maxSeats": 4,
+    "status": "Not Opened",
+    "openedAt": null,
+    "openCount": 0,
+    "attendingCount": 0,
+    "respondedAt": null,
+    "message": "",
+    "phone": ""
+  },
+  {
+    "slug": "farhana-apu",
+    "displayName": "Farhana Apu & Family",
+    "side": "bride",
+    "maxSeats": 3,
+    "status": "Attending",
+    "openedAt": "2026-11-17T15:10:00.000Z",
+    "openCount": 3,
+    "attendingCount": 3,
+    "respondedAt": "2026-11-17T18:50:24.340Z",
+    "message": "",
+    "phone": ""
+  },
+  {
+    "slug": "dr-mahmud-family",
+    "displayName": "Dr. Mahmud & Mrs. Rubina",
+    "side": "groom",
+    "maxSeats": 2,
+    "status": "Attending",
+    "openedAt": "2026-11-16T10:22:00.000Z",
+    "openCount": 3,
+    "attendingCount": 2,
+    "respondedAt": "2026-11-16T10:25:12.000Z",
+    "message": "BarakAllahu lakuma wa baraka alaikuma! Can't wait to celebrate with both families.",
+    "phone": "+880 1711-223344"
+  },
+  {
+    "slug": "nusrat-and-saad",
+    "displayName": "Nusrat & Saad",
+    "side": "bride",
+    "maxSeats": 2,
+    "status": "Attending",
+    "openedAt": "2026-11-15T19:05:00.000Z",
+    "openCount": 1,
+    "attendingCount": 2,
+    "respondedAt": "2026-11-15T19:08:40.000Z",
+    "message": "Mubarak to Amina & Zayd! Looking forward to the Nikah and dinner.",
+    "phone": "+880 1811-556677"
+  },
+  {
+    "slug": "tanvir-bhai",
+    "displayName": "Tanvir Bhai",
+    "side": "groom",
+    "maxSeats": 1,
+    "status": "Declined",
+    "openedAt": "2026-11-15T12:00:00.000Z",
+    "openCount": 1,
+    "attendingCount": 0,
+    "respondedAt": "2026-11-15T12:04:00.000Z",
+    "message": "Will be traveling that week unfortunately, but sending all my duas!",
+    "phone": ""
+  },
+  {
+    "slug": "shaheen-khala",
+    "displayName": "Shaheen Khala & Family",
+    "side": "bride",
+    "maxSeats": 5,
+    "status": "Not Opened",
+    "openedAt": null,
+    "openCount": 0,
+    "attendingCount": 0,
+    "respondedAt": null,
+    "message": "",
+    "phone": ""
+  }
+]
